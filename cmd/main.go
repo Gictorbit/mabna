@@ -11,6 +11,8 @@ import (
 	"syscall"
 )
 
+var RowsNumberImport uint
+
 func main() {
 	app := &cli.App{
 		Name:  "finance",
@@ -33,12 +35,12 @@ func main() {
 						return err
 					}
 
-					userDB, err := db.NewFinanceWithURL(finEnv.FinanceDatabase)
+					finDB, err := db.NewFinanceWithURL(finEnv.FinanceDatabase)
 					if err != nil {
 						return err
 					}
 
-					httpserver := service.NewFinanceServer(logger, userDB, finEnv)
+					httpserver := service.NewFinanceServer(logger, finDB, finEnv)
 					go func() {
 						if e := httpserver.Run(finEnv.Host, finEnv.Port); e != nil {
 							logger.Error("failed to start user http", zap.Error(e))
@@ -49,6 +51,42 @@ func main() {
 					signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 					<-sigs
 					logger.Info("stop http server")
+					return nil
+				},
+			},
+			{
+				Name:  "fill",
+				Usage: "inserts n rows in trade table",
+				Flags: []cli.Flag{
+					&cli.UintFlag{
+						Name:        "rows",
+						Usage:       "number of rows to import",
+						Value:       10,
+						DefaultText: "10",
+						Destination: &RowsNumberImport,
+					},
+				},
+				Action: func(ctx *cli.Context) error {
+					finEnv, err := service.ReadFinanceEnvironment()
+					if err != nil {
+						return err
+					}
+					loggerConfig := zap.NewProductionConfig()
+					if finEnv.DebugMode {
+						loggerConfig.Level = zap.NewAtomicLevelAt(zap.DebugLevel)
+					}
+					logger, err := loggerConfig.Build()
+					if err != nil {
+						return err
+					}
+
+					financeDBConn, err := db.ConnectToFinanceDB(finEnv.FinanceDatabase)
+					if err != nil {
+						return err
+					}
+					if e := ImportRandomRows(financeDBConn, RowsNumberImport, logger); e != nil {
+						return e
+					}
 					return nil
 				},
 			},
