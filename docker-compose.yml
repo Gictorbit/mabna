@@ -1,0 +1,51 @@
+version: "3.9"
+services:
+  traefik:
+    image: traefik:v3.0
+    container_name: trx-traefik
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - "./deps/traefik:/traefik:ro"
+    command:
+      - "--configFile=/traefik/traefik.yml"
+    restart: always
+    networks:
+      - mainet
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --spider -S http://127.0.0.1/ping 2>&1 | grep 'HTTP/' | awk '{print $2}' | grep '^200$'" ]
+      interval: 5s
+      timeout: 10s
+      retries: 3
+
+  postgresdb:
+    image: postgres:16
+    container_name: trx-postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdb-volume:/data/postgres
+      - ./deps/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql
+    environment:
+      POSTGRES_USER: pgadmin
+      POSTGRES_PASSWORD: pgpassword2024
+      POSTGRES_DB: pgdb
+      PGDATA: /data/postgres
+    networks:
+      - mainet
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready","-U","pgadmin", "-q" ]
+      timeout: 20s
+      interval: 3s
+      retries: 15
+    restart: always
+
+
+volumes:
+  pgdb-volume:
+
+networks:
+  mainet:
+    external: true
