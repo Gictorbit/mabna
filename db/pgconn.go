@@ -6,6 +6,7 @@ import (
 	"time"
 )
 
+//go:generate mockgen -source=$GOFILE -destination=mock_db/conn.go -package=$GOPACKAG
 type FinanceDatabase interface {
 	GetPgConn() *pgxpool.Pool
 	GetLatestTrades(ctx context.Context) ([]Instrument, error)
